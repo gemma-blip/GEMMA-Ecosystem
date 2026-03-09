@@ -1,5 +1,5 @@
-const { put, del, list } = require('@vercel/blob');
-const jwt = require('jsonwebtoken');
+import { put, del, list } from '@vercel/blob';
+import jwt from 'jsonwebtoken';
 
 function verifyAdmin(req) {
   const token = req.headers.authorization?.split(' ')[1];
@@ -7,7 +7,7 @@ function verifyAdmin(req) {
   jwt.verify(token, process.env.ADMIN_JWT_SECRET);
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -21,39 +21,39 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { articleId } = req.body;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+
+  const { articleId } = body;
 
   if (!articleId) {
     return res.status(400).json({ error: 'articleId is required' });
   }
 
   try {
-    // Find the approved article blob
     const { blobs } = await list({
       prefix: `articles/approved/${articleId}`,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
 
     if (!blobs || blobs.length === 0) {
-      return res.status(404).json({ error: 'Approved article not found' });
+      return res.status(404).json({ error: 'Article not found in approved' });
     }
 
-    // Fetch article data
     const response = await fetch(blobs[0].url);
     const article = await response.json();
 
-    // Update status
     article.status = 'published';
     article.publishedAt = new Date().toISOString();
 
-    // Write to published folder
     await put(`articles/published/${articleId}.json`, JSON.stringify(article, null, 2), {
       access: 'public',
       contentType: 'application/json',
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
 
-    // Delete from approved
     await del(blobs[0].url, {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
@@ -63,4 +63,4 @@ module.exports = async function handler(req, res) {
     console.error('Publish error:', err);
     return res.status(500).json({ error: 'Publish failed', details: err.message });
   }
-};
+}

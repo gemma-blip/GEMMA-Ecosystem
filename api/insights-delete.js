@@ -1,5 +1,5 @@
-const { del, list } = require('@vercel/blob');
-const jwt = require('jsonwebtoken');
+import { del, list } from '@vercel/blob';
+import jwt from 'jsonwebtoken';
 
 function verifyAdmin(req) {
   const token = req.headers.authorization?.split(' ')[1];
@@ -7,7 +7,7 @@ function verifyAdmin(req) {
   jwt.verify(token, process.env.ADMIN_JWT_SECRET);
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -21,7 +21,12 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { articleId, status } = req.body;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+
+  const { articleId, status } = body;
 
   if (!articleId) {
     return res.status(400).json({ error: 'articleId is required' });
@@ -51,4 +56,4 @@ module.exports = async function handler(req, res) {
     console.error('Delete error:', err);
     return res.status(500).json({ error: 'Delete failed', details: err.message });
   }
-};
+}

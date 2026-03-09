@@ -1,6 +1,6 @@
-const { list } = require('@vercel/blob');
+import { list } from '@vercel/blob';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -21,14 +21,12 @@ module.exports = async function handler(req, res) {
     });
 
     if (!blobs || blobs.length === 0) {
-      // Cache published list for 2 minutes
       if (status === 'published') {
         res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
       }
       return res.status(200).json([]);
     }
 
-    // Fetch each article's content
     const articles = await Promise.all(
       blobs
         .filter(blob => blob.pathname.endsWith('.json'))
@@ -43,12 +41,10 @@ module.exports = async function handler(req, res) {
         })
     );
 
-    // Filter nulls and sort by date descending
     const validArticles = articles
       .filter(Boolean)
       .sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
 
-    // Cache published articles for 2 minutes
     if (status === 'published') {
       res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
     }
@@ -58,4 +54,4 @@ module.exports = async function handler(req, res) {
     console.error('List error:', err);
     return res.status(500).json({ error: 'Failed to fetch articles', details: err.message });
   }
-};
+}

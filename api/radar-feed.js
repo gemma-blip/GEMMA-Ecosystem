@@ -9,7 +9,7 @@ function formatRelativeTime(dateString) {
   return `${Math.floor(diffSeconds / 86400)}d ago`;
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -20,7 +20,6 @@ module.exports = async function handler(req, res) {
   const limit = parseInt(req.query.limit) || 10;
 
   try {
-    // Primary: CryptoCompare News API (free, no auth required, no Cloudflare)
     const feed = await fetchCryptoCompareNews(limit);
 
     if (feed.length > 0) {
@@ -28,7 +27,6 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(feed);
     }
 
-    // Fallback: CoinGecko status updates
     const fallbackFeed = await fetchCoinGeckoNews(limit);
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     return res.status(200).json(fallbackFeed);
@@ -37,7 +35,7 @@ module.exports = async function handler(req, res) {
     console.error('Radar feed error:', err);
     return res.status(500).json({ error: 'Feed unavailable', details: err.message, items: [] });
   }
-};
+}
 
 async function fetchCryptoCompareNews(limit) {
   const response = await fetch(

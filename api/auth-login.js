@@ -1,8 +1,7 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-module.exports = async function handler(req, res) {
-  // CORS headers
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -16,7 +15,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Parse body
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (e) { body = {}; }
@@ -53,4 +51,4 @@ module.exports = async function handler(req, res) {
     console.error('Auth error:', err);
     return res.status(500).json({ error: 'Authentication failed', details: err.message });
   }
-};
+}
