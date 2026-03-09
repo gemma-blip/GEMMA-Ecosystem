@@ -42,10 +42,48 @@ export default function GemmaInsights({ lang, onAdminClick, translations }) {
   };
 
   const getArticleContent = (article) => {
+    let content = '';
     if (article.content && typeof article.content === 'object') {
-      return article.content[lang] || article.content.pt || article.content.en || '';
+      content = article.content[lang] || article.content.pt || article.content.en || '';
+    } else {
+      content = article.content || '';
     }
-    return article.content || '';
+    // Remove leading title heading if it duplicates the article title
+    const title = getArticleTitle(article);
+    content = content.replace(/^#\s+.*\n+/, '').trim();
+    return content;
+  };
+
+  // Simple markdown to HTML converter for article display
+  const renderMarkdown = (md) => {
+    if (!md) return '';
+    let html = md
+      // Headers
+      .replace(/^#### (.*$)/gm, '<h4 class="text-base font-bold text-slate-200 mt-4 mb-2">$1</h4>')
+      .replace(/^### (.*$)/gm, '<h3 class="text-lg font-bold text-slate-200 mt-5 mb-2">$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold text-indigo-400 mt-6 mb-3">$1</h2>')
+      // Bold and italic
+      .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-200">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      // Lists
+      .replace(/^- (.*$)/gm, '<li class="ml-4 list-disc">$1</li>')
+      .replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal">$1</li>')
+      // Paragraphs (double newline)
+      .replace(/\n\n/g, '</p><p class="mb-3">')
+      // Single newlines within paragraphs
+      .replace(/\n/g, '<br/>');
+    return `<p class="mb-3">${html}</p>`;
+  };
+
+  const getPlainPreview = (content) => {
+    return content
+      .replace(/^#+\s+.*$/gm, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/^[-*]\s/gm, '')
+      .replace(/\n+/g, ' ')
+      .trim();
   };
 
   const getTopicLabel = (topic) => {
@@ -111,12 +149,13 @@ export default function GemmaInsights({ lang, onAdminClick, translations }) {
               </h4>
 
               {expandedId === article.id ? (
-                <div className="text-slate-400 text-sm leading-relaxed whitespace-pre-wrap mb-3">
-                  {getArticleContent(article)}
-                </div>
+                <div
+                  className="text-slate-400 text-sm leading-relaxed mb-3 prose-invert"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(getArticleContent(article)) }}
+                />
               ) : (
                 <p className="text-slate-500 text-sm mb-3 line-clamp-2">
-                  {getArticleContent(article).slice(0, 180)}...
+                  {getPlainPreview(getArticleContent(article)).slice(0, 180)}...
                 </p>
               )}
 
