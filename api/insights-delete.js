@@ -1,9 +1,8 @@
 import { del, list } from '@vercel/blob';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const jwt = require('jsonwebtoken');
 
-function verifyAdmin(req) {
+async function verifyAdmin(req) {
+  const jwtModule = await import('jsonwebtoken');
+  const jwt = jwtModule.default || jwtModule;
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) throw new Error('No token');
   jwt.verify(token, process.env.ADMIN_JWT_SECRET);
@@ -18,7 +17,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    verifyAdmin(req);
+    await verifyAdmin(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }

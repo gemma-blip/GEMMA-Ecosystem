@@ -1,8 +1,4 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const jwt = require('jsonwebtoken');
-
-export default function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -16,6 +12,8 @@ export default function handler(req, res) {
   const secret = process.env.ADMIN_JWT_SECRET;
 
   try {
+    const jwtModule = await import('jsonwebtoken');
+    const jwt = jwtModule.default || jwtModule;
     const decoded = jwt.verify(token, secret);
     return res.status(200).json({ valid: true, exp: decoded.exp });
   } catch (err) {
