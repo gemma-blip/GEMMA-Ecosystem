@@ -1,33 +1,17 @@
+import { scryptSync, timingSafeEqual } from 'crypto';
 import { createRequire } from 'module';
-import { createHmac, timingSafeEqual } from 'crypto';
 
 const require = createRequire(import.meta.url);
-
-// Try to load bcryptjs - check version for debugging
-let bcrypt;
-let bcryptVersion = 'unknown';
-try {
-  bcrypt = require('bcryptjs');
-  const pkg = require('bcryptjs/package.json');
-  bcryptVersion = pkg.version;
-} catch (e) {
-  bcrypt = null;
-}
-
 const jwt = require('jsonwebtoken');
 
-// Fallback: HMAC-based password verification
-// If bcryptjs fails, we use HMAC-SHA256 with the JWT secret as key
-function hmacVerify(password, storedHash, secret) {
-  const hmac = createHmac('sha256', secret);
-  hmac.update(password);
-  const computed = hmac.digest('hex');
+function verifyPassword(password, storedHash) {
+  // storedHash format: "salt:hash" (both hex)
+  const [salt, hash] = storedHash.split(':');
+  if (!salt || !hash) return false;
 
-  // If stored hash starts with $2, it's bcrypt — can't verify with HMAC
-  if (storedHash.startsWith('$2')) return null;
-
-  const a = Buffer.from(computed, 'utf8');
-  const b = Buffer.from(storedHash, 'utf8');
+  const computed = scryptSync(password, salt, 64).toString('hex');
+  const a = Buffer.from(computed, 'hex');
+  const b = Buffer.from(hash, 'hex');
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
@@ -64,24 +48,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    let valid = false;
-
-    // Try bcryptjs first
-    if (bcrypt) {
-      try {
-        valid = await bcrypt.compare(password, hash);
-      } catch (bcryptErr) {
-        console.error(`bcryptjs v${bcryptVersion} failed:`, bcryptErr.message);
-        // bcrypt failed - return error with version info for debugging
-        return res.status(500).json({
-          error: 'Authentication failed',
-          bcryptVersion,
-          bcryptError: bcryptErr.message
-        });
-      }
-    } else {
-      return res.status(500).json({ error: 'bcryptjs not available' });
-    }
+    const valid = verifyPassword(password, hash);
 
     if (!valid) {
       return res.status(401).json({ error: 'Invalid password' });
@@ -96,6 +63,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ token, expiresIn: '24h' });
   } catch (err) {
     console.error('Auth error:', err);
-    return res.status(500).json({ error: 'Authentication failed', debug: String(err) });
+    return res.status(500).json({ error: 'Authentication failed' });
   }
 }
