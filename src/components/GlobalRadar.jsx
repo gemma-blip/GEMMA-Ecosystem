@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, TrendingUp, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { Database, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import { radarAPI } from '../utils/api';
 
 export default function GlobalRadar({ lang, translations }) {
@@ -12,13 +12,13 @@ export default function GlobalRadar({ lang, translations }) {
 
   useEffect(() => {
     fetchRadar();
-    const interval = setInterval(fetchRadar, 120000); // Refresh every 2 min
+    const interval = setInterval(fetchRadar, 3600000); // Refresh every 1h
     return () => clearInterval(interval);
   }, []);
 
   const fetchRadar = async () => {
     try {
-      const response = await radarAPI.feed(10);
+      const response = await radarAPI.feed();
       const data = Array.isArray(response.data) ? response.data : [];
       setFeed(data);
       setError('');
@@ -26,21 +26,16 @@ export default function GlobalRadar({ lang, translations }) {
     } catch (err) {
       console.warn('Failed to fetch radar:', err);
       setError(lang === 'pt' ? 'Feed indisponível' : 'Feed unavailable');
-      // Keep existing feed data on error
     }
     setLoading(false);
   };
 
-  const formatTime = (timestamp) => {
+  const formatDate = (timestamp) => {
     if (!timestamp) return '';
-    const now = new Date();
-    const date = new Date(timestamp);
-    const diffSeconds = Math.floor((now - date) / 1000);
-
-    if (diffSeconds < 60) return `${diffSeconds}s`;
-    if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m`;
-    if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h`;
-    return `${Math.floor(diffSeconds / 86400)}d`;
+    return new Date(timestamp).toLocaleDateString(
+      lang === 'pt' ? 'pt-BR' : 'en-US',
+      { month: 'short', day: 'numeric' }
+    );
   };
 
   return (
@@ -48,29 +43,23 @@ export default function GlobalRadar({ lang, translations }) {
       <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
         <Database className="text-indigo-500" size={24} />
         <h3 className="text-2xl font-bold text-white">{t.news.radarTitle}</h3>
-        {!loading && feed.length > 0 && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-emerald-400 text-xs font-semibold tracking-wider">LIVE</span>
-          </div>
-        )}
       </div>
 
       <p className="text-slate-400 text-sm font-light mb-2">{t.news.radarDesc}</p>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="space-y-3">
         {loading ? (
-          <div className="flex items-center gap-3 text-slate-500 text-sm p-8 justify-center">
+          <div className="flex items-center gap-3 text-slate-500 text-sm py-8 justify-center">
             <RefreshCw size={16} className="animate-spin" />
             <span>{lang === 'pt' ? 'Carregando feed...' : 'Loading feed...'}</span>
           </div>
         ) : error && feed.length === 0 ? (
-          <div className="flex items-center gap-3 text-slate-500 text-sm p-8 justify-center">
+          <div className="flex items-center gap-3 text-slate-500 text-sm py-8 justify-center">
             <AlertCircle size={16} className="text-amber-500" />
             <span>{error}</span>
           </div>
         ) : feed.length === 0 ? (
-          <div className="p-8 text-center">
+          <div className="py-8 text-center">
             <Database className="text-slate-700 mx-auto mb-3" size={32} />
             <p className="text-slate-500 text-sm italic">
               {lang === 'pt' ? 'Nenhuma notícia disponível.' : 'No news available.'}
@@ -78,46 +67,34 @@ export default function GlobalRadar({ lang, translations }) {
           </div>
         ) : (
           <>
-            {feed.map((item, idx) => (
+            {feed.map((item) => (
               <a
                 href={item.newsUrl || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
                 key={item.id}
-                className={`block p-5 hover:bg-slate-800/50 transition-colors group ${
-                  idx !== feed.length - 1 ? 'border-b border-slate-800' : ''
-                }`}
+                className="block bg-slate-900 border border-slate-800 p-5 rounded-xl hover:bg-slate-800/50 hover:border-slate-700 transition-all group"
               >
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <div className="flex items-center gap-2 mb-2">
                       <span className="text-indigo-400 text-xs font-semibold">{item.source}</span>
-                      <span className="text-slate-600 text-xs">·</span>
-                      <span className="text-slate-500 text-xs">{item.time || formatTime(item.timestamp)}</span>
-                      {item.currencies && item.currencies.length > 0 && (
-                        <>
-                          <span className="text-slate-600 text-xs">·</span>
-                          {item.currencies.map((code) => (
-                            <span key={code} className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
-                              {code}
-                            </span>
-                          ))}
-                        </>
-                      )}
+                      <span className="text-slate-700 text-xs">·</span>
+                      <span className="text-slate-500 text-xs">{item.date || formatDate(item.timestamp)}</span>
                     </div>
                     <h4 className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors leading-relaxed">
                       {item.title}
                     </h4>
                   </div>
-                  <ExternalLink size={14} className="text-slate-600 group-hover:text-indigo-400 shrink-0 mt-1 transition-colors" />
+                  <ExternalLink size={14} className="text-slate-700 group-hover:text-indigo-400 shrink-0 mt-1 transition-colors" />
                 </div>
               </a>
             ))}
 
             {lastUpdated && (
-              <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/50">
+              <div className="pt-2">
                 <p className="text-slate-600 text-xs text-center">
-                  {lang === 'pt' ? 'Última atualização' : 'Last updated'}: {lastUpdated.toLocaleTimeString(lang === 'pt' ? 'pt-BR' : 'en-US')}
+                  {lang === 'pt' ? 'Última atualização' : 'Last updated'}: {lastUpdated.toLocaleDateString(lang === 'pt' ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   {' · '}
                   <button onClick={fetchRadar} className="text-indigo-500 hover:text-indigo-400 transition-colors">
                     {lang === 'pt' ? 'Atualizar' : 'Refresh'}

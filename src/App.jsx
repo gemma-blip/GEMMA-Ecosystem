@@ -125,7 +125,7 @@ const translations = {
       title: 'Market Research & Insights',
       subtitle: 'Inteligência de mercado, rigor jurídico e as principais movimentações da criptoeconomia global.',
       insightsTitle: 'GEMMA Insights',
-      insightsDesc: 'Curadoria inteligente movida a IA e supervisionada pela diretoria do consórcio, trazendo as atualizações e papers globais mais precisos sobre planejamento tributário internacional, Teoria das Bandeiras e inovações em blockchain.',
+      insightsDesc: 'Curadoria inteligente supervisionada pela diretoria do consórcio, trazendo as atualizações e papers globais mais precisos sobre planejamento tributário internacional, Teoria das Bandeiras e inovações em blockchain.',
       radarTitle: 'Global Crypto Radar',
       radarDesc: 'Acompanhe em tempo real as atualizações mais críticas do mercado financeiro e de criptoativos, com curadoria automatizada das fontes globais de maior credibilidade.',
       readMore: 'Ler artigo'
@@ -207,7 +207,7 @@ const translations = {
       title: 'Market Research & Insights',
       subtitle: 'Market intelligence, legal rigor, and the main movements of the global cryptoeconomy.',
       insightsTitle: 'GEMMA Insights',
-      insightsDesc: 'AI-driven intelligent curation supervised by the consortium\'s board, bringing the most accurate global updates and papers on international tax planning, Flag Theory, and blockchain innovations.',
+      insightsDesc: 'Intelligent curation supervised by the consortium\'s board, bringing the most accurate global updates and papers on international tax planning, Flag Theory, and blockchain innovations.',
       radarTitle: 'Global Crypto Radar',
       radarDesc: 'Track the most critical updates from the financial and cryptoasset markets in real-time, with automated curation from the most credible global sources.',
       readMore: 'Read article'

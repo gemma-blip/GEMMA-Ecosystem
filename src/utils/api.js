@@ -40,7 +40,7 @@ export const insightsAPI = {
 };
 
 export const radarAPI = {
-  feed: (limit = 10) => apiClient.get(`/radar-feed?limit=${limit}`),
+  feed: () => apiClient.get('/radar-feed'),
 };
 
 export default apiClient;
