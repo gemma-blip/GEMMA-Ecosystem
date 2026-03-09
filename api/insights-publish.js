@@ -1,5 +1,5 @@
-import { put, del, list } from '@vercel/blob';
-import jwt from 'jsonwebtoken';
+const { put, del, list } = require('@vercel/blob');
+const jwt = require('jsonwebtoken');
 
 function verifyAdmin(req) {
   const token = req.headers.authorization?.split(' ')[1];
@@ -7,7 +7,7 @@ function verifyAdmin(req) {
   jwt.verify(token, process.env.ADMIN_JWT_SECRET);
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -63,4 +63,4 @@ export default async function handler(req, res) {
     console.error('Publish error:', err);
     return res.status(500).json({ error: 'Publish failed', details: err.message });
   }
-}
+};

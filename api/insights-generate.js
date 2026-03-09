@@ -1,6 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { put } from '@vercel/blob';
-import jwt from 'jsonwebtoken';
+const Anthropic = require('@anthropic-ai/sdk').default;
+const { put } = require('@vercel/blob');
+const jwt = require('jsonwebtoken');
 
 function verifyAdmin(req) {
   const token = req.headers.authorization?.split(' ')[1];
@@ -30,7 +30,7 @@ const TOPIC_PROMPTS = {
   }
 };
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -44,7 +44,12 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { topic, language } = req.body;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+
+  const { topic, language } = body;
 
   if (!TOPIC_PROMPTS[topic]) {
     return res.status(400).json({ error: 'Invalid topic. Use: flag-theory, tax-planning, blockchain-innovation' });
@@ -70,14 +75,12 @@ export default async function handler(req, res) {
     // Parse JSON from Claude's response
     let articleTitle, articleContent;
     try {
-      // Try to extract JSON from the response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         articleTitle = parsed.title;
         articleContent = parsed.content;
       } else {
-        // Fallback: use first line as title, rest as content
         const lines = responseText.split('\n');
         articleTitle = lines[0].replace(/^#\s*/, '').trim();
         articleContent = lines.slice(1).join('\n').trim();
@@ -119,4 +122,4 @@ export default async function handler(req, res) {
     console.error('Generation error:', err);
     return res.status(500).json({ error: 'Article generation failed', details: err.message });
   }
-}
+};

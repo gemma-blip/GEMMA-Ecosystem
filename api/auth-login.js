@@ -1,7 +1,7 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -15,27 +15,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Parse body if needed (Vercel should auto-parse, but handle edge cases)
-  let body = req.body;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch (e) { body = {}; }
-  }
-
-  const password = body?.password;
-
-  if (!password) {
-    return res.status(400).json({ error: 'Password is required', receivedBody: typeof req.body });
-  }
-
-  const hash = process.env.ADMIN_PASSWORD_HASH;
-  const secret = process.env.ADMIN_JWT_SECRET;
-
-  if (!hash || !secret) {
-    console.error('Missing ADMIN_PASSWORD_HASH or ADMIN_JWT_SECRET env vars');
-    return res.status(500).json({ error: 'Server configuration error' });
-  }
-
   try {
+    // Parse body
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch (e) { body = {}; }
+    }
+
+    const password = body?.password;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const hash = process.env.ADMIN_PASSWORD_HASH;
+    const secret = process.env.ADMIN_JWT_SECRET;
+
+    if (!hash || !secret) {
+      console.error('Missing ADMIN_PASSWORD_HASH or ADMIN_JWT_SECRET env vars');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
     const valid = await bcrypt.compare(password, hash);
 
     if (!valid) {
@@ -51,6 +51,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ token, expiresIn: '24h' });
   } catch (err) {
     console.error('Auth error:', err);
-    return res.status(500).json({ error: 'Authentication failed' });
+    return res.status(500).json({ error: 'Authentication failed', details: err.message });
   }
-}
+};

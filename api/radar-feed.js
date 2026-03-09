@@ -9,7 +9,7 @@ function formatRelativeTime(dateString) {
   return `${Math.floor(diffSeconds / 86400)}d ago`;
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     console.error('Radar feed error:', err);
     return res.status(500).json({ error: 'Feed unavailable', details: err.message, items: [] });
   }
-}
+};
 
 async function fetchCryptoCompareNews(limit) {
   const response = await fetch(
