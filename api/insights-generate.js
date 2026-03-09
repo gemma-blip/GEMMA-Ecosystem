@@ -85,18 +85,30 @@ export default async function handler(req, res) {
     let articleTitle, articleContent;
 
     const titleMatch = responseText.match(/<article_title>([\s\S]*?)<\/article_title>/);
-    const contentMatch = responseText.match(/<article_content>([\s\S]*?)<\/article_content>/);
+    // Handle both closed and unclosed content tag (Claude may hit token limit)
+    const contentMatch = responseText.match(/<article_content>([\s\S]*?)(?:<\/article_content>|$)/);
 
     if (titleMatch && contentMatch) {
       articleTitle = titleMatch[1].trim();
-      articleContent = contentMatch[1].trim();
+      // Clean any remaining XML tags from content
+      articleContent = contentMatch[1]
+        .replace(/<\/?article_\w+>/g, '')
+        .trim();
+    } else if (titleMatch) {
+      // Title found but no content tag — extract everything after title tag
+      articleTitle = titleMatch[1].trim();
+      articleContent = responseText
+        .replace(/<article_title>[\s\S]*?<\/article_title>/, '')
+        .replace(/<\/?article_\w+>/g, '')
+        .trim();
     } else {
-      // Fallback: try to extract title from first heading and rest as content
-      const lines = responseText.replace(/```[\s\S]*?```/g, '').split('\n').filter(l => l.trim());
+      // No XML tags — use heading-based fallback
+      const cleanText = responseText.replace(/<\/?article_\w+>/g, '');
+      const lines = cleanText.split('\n').filter(l => l.trim());
       const headingLine = lines.find(l => l.startsWith('#'));
       if (headingLine) {
         articleTitle = headingLine.replace(/^#+\s*/, '').trim();
-        articleContent = responseText.replace(headingLine, '').trim();
+        articleContent = cleanText.replace(headingLine, '').trim();
       } else {
         articleTitle = lines[0]?.trim() || 'Untitled Article';
         articleContent = lines.slice(1).join('\n').trim();
