@@ -22,7 +22,7 @@ export default async function handler(req, res) {
 
     if (!blobs || blobs.length === 0) {
       if (status === 'published') {
-        res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
       }
       return res.status(200).json([]);
     }
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       .sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
 
     if (status === 'published') {
-      res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
     }
 
     return res.status(200).json(validArticles);
