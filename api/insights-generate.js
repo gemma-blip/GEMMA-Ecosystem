@@ -109,7 +109,7 @@ export default async function handler(req, res) {
 
     // Save to Vercel Blob Storage
     await put(`articles/pending/${articleId}.json`, JSON.stringify(articleData, null, 2), {
-      access: 'public',
+      access: 'private',
       contentType: 'application/json',
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
