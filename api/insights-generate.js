@@ -12,7 +12,7 @@ const SYSTEM_PROMPT = `You are an expert editorial AI for the GEMMA Ecosystem, a
 You write professional, well-researched articles about international tax planning, Flag Theory, and blockchain innovations.
 Your articles should be authoritative, citing real frameworks and jurisdictions when relevant.
 Always write in a professional tone suitable for institutional investors and legal professionals.
-Structure articles with a clear title, introduction, 2-3 focused sections, and a brief conclusion. Be concise and impactful — aim for around 800-1200 words total.
+Structure articles with a clear title, introduction, 2-3 focused sections, and a brief conclusion. Be concise and impactful — aim for around 600-900 words total.
 
 IMPORTANT: Format your response EXACTLY like this:
 <article_title>Your Article Title Here</article_title>
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 3000,
+      max_tokens: 2500,
       system: SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: TOPIC_PROMPTS[topic][language] }
