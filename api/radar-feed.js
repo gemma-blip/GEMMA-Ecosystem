@@ -17,56 +17,94 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const apiKey = process.env.CRYPTOPANIC_API_KEY;
-  const limit = req.query.limit || 10;
-
-  if (!apiKey) {
-    console.error('Missing CRYPTOPANIC_API_KEY env var');
-    return res.status(500).json({ error: 'API configuration error', items: [] });
-  }
+  const limit = parseInt(req.query.limit) || 10;
 
   try {
-    const response = await fetch(
-      `https://cryptopanic.com/api/v1/posts/?auth_token=${apiKey}&limit=${limit}&kind=news&filter=trending`,
-      {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      }
-    );
+    // Primary: CryptoCompare News API (free, no auth required, no Cloudflare)
+    const feed = await fetchCryptoCompareNews(limit);
 
-    if (!response.ok) {
-      throw new Error(`CryptoPanic API returned ${response.status}: ${response.statusText}`);
+    if (feed.length > 0) {
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+      return res.status(200).json(feed);
     }
 
-    const data = await response.json();
-
-    if (!data.results || !Array.isArray(data.results)) {
-      throw new Error('Invalid response format from CryptoPanic');
-    }
-
-    // Transform CryptoPanic format to our schema
-    const feed = data.results.map((item) => ({
-      id: String(item.id),
-      title: item.title,
-      source: item.source?.title || 'Unknown',
-      sourceUrl: item.source?.domain || '',
-      newsUrl: item.url || '#',
-      timestamp: item.created_at,
-      time: formatRelativeTime(item.created_at),
-      votes: {
-        positive: item.votes?.positive || 0,
-        negative: item.votes?.negative || 0,
-      },
-      currencies: item.currencies
-        ? item.currencies.map(c => c.code).slice(0, 3)
-        : [],
-    }));
-
-    // Cache for 5 minutes
+    // Fallback: CoinGecko status updates
+    const fallbackFeed = await fetchCoinGeckoNews(limit);
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-    return res.status(200).json(feed);
+    return res.status(200).json(fallbackFeed);
+
   } catch (err) {
-    console.error('CryptoPanic error:', err);
+    console.error('Radar feed error:', err);
     return res.status(500).json({ error: 'Feed unavailable', details: err.message, items: [] });
   }
+}
+
+async function fetchCryptoCompareNews(limit) {
+  const response = await fetch(
+    `https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=popular&limit=${limit}`,
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'GEMMA-Ecosystem/1.0',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`CryptoCompare API returned ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.Data || !Array.isArray(data.Data)) {
+    throw new Error('Invalid response from CryptoCompare');
+  }
+
+  return data.Data.map((item) => ({
+    id: String(item.id),
+    title: item.title,
+    source: item.source_info?.name || item.source || 'Unknown',
+    sourceUrl: item.source_info?.url || '',
+    newsUrl: item.guid || item.url || '#',
+    timestamp: new Date(item.published_on * 1000).toISOString(),
+    time: formatRelativeTime(new Date(item.published_on * 1000).toISOString()),
+    imageUrl: item.imageurl || null,
+    categories: item.categories ? item.categories.split('|').slice(0, 3) : [],
+    currencies: item.tags ? item.tags.split('|').slice(0, 3).map(t => t.toUpperCase()) : [],
+  }));
+}
+
+async function fetchCoinGeckoNews(limit) {
+  const response = await fetch(
+    `https://api.coingecko.com/api/v3/news?per_page=${limit}`,
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'GEMMA-Ecosystem/1.0',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`CoinGecko News API returned ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.data || !Array.isArray(data.data)) {
+    return [];
+  }
+
+  return data.data.map((item) => ({
+    id: String(item.id || Math.random().toString(36).slice(2)),
+    title: item.title,
+    source: item.author || 'CoinGecko',
+    sourceUrl: '',
+    newsUrl: item.url || '#',
+    timestamp: item.updated_at || new Date().toISOString(),
+    time: formatRelativeTime(item.updated_at || new Date().toISOString()),
+    currencies: [],
+  }));
 }
