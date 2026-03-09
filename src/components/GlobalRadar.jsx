@@ -80,7 +80,7 @@ export default function GlobalRadar({ lang, translations }) {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-indigo-400 text-xs font-semibold">{item.source}</span>
                       <span className="text-slate-700 text-xs">·</span>
-                      <span className="text-slate-500 text-xs">{item.date || formatDate(item.timestamp)}</span>
+                      <span className="text-slate-500 text-xs">{(item.date && typeof item.date === 'object' ? item.date[lang] : item.date) || formatDate(item.timestamp)}</span>
                     </div>
                     <h4 className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors leading-relaxed">
                       {item.title}

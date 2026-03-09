@@ -151,11 +151,6 @@ export default function GemmaInsights({ lang, onAdminClick, translations }) {
                     <span className="text-indigo-500/80 text-xs font-mono">
                       {formatDate(article.publishedAt || article.generatedAt)}
                     </span>
-                    {article.topic && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                        {getTopicLabel(article.topic)}
-                      </span>
-                    )}
                   </div>
 
                   <h4 className="text-lg font-bold text-slate-200 group-hover:text-indigo-400 transition-colors mb-3">
