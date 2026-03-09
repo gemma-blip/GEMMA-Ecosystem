@@ -16,6 +16,39 @@ export default async function handler(req, res) {
   }
 }
 
+async function translateTitles(titles) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const prompt = `Translate the following news headlines from English to Brazilian Portuguese. Keep them concise and journalistic. Return ONLY the translations, one per line, in the same order. Do not number them.
+
+${titles.map((t, i) => `${i + 1}. ${t}`).join('\n')}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+    const lines = text.split('\n').map(l => l.replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean);
+    return lines.length === titles.length ? lines : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchCuratedNews() {
   // Fetch a large pool to curate from
   const response = await fetch(
@@ -97,11 +130,18 @@ async function fetchCuratedNews() {
     }
   }
 
-  return selected.map((item) => {
+  // Translate titles to Portuguese
+  const englishTitles = selected.map(item => item.title);
+  const ptTitles = await translateTitles(englishTitles);
+
+  return selected.map((item, index) => {
     const publishedDate = new Date(item.published_on * 1000);
     return {
       id: String(item.id),
-      title: item.title,
+      title: {
+        en: item.title,
+        pt: ptTitles?.[index] || item.title,
+      },
       source: item.source_info?.name || item.source || 'Unknown',
       newsUrl: item.guid || item.url || '#',
       timestamp: publishedDate.toISOString(),

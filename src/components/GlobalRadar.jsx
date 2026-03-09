@@ -83,7 +83,7 @@ export default function GlobalRadar({ lang, translations }) {
                       <span className="text-slate-500 text-xs">{(item.date && typeof item.date === 'object' ? item.date[lang] : item.date) || formatDate(item.timestamp)}</span>
                     </div>
                     <h4 className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors leading-relaxed">
-                      {item.title}
+                      {item.title && typeof item.title === 'object' ? (item.title[lang] || item.title.en) : item.title}
                     </h4>
                   </div>
                   <ExternalLink size={14} className="text-slate-700 group-hover:text-indigo-400 shrink-0 mt-1 transition-colors" />

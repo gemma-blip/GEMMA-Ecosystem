@@ -32,8 +32,8 @@ const TOPIC_PROMPTS = {
     en: 'Write an original, detailed article in English about international tax planning for crypto asset holders. Cover offshore/onshore structures, double taxation treaties, and regulatory compliance in Brazil and Europe.'
   },
   'blockchain-innovation': {
-    pt: 'Escreva um artigo original e detalhado em português sobre as inovações mais recentes em tecnologia blockchain. Aborde DeFi institucional, tokenização de ativos reais (RWA), e avanços em escalabilidade e interoperabilidade.',
-    en: 'Write an original, detailed article in English about the latest blockchain technology innovations. Cover institutional DeFi, real-world asset tokenization (RWA), and advances in scalability and interoperability.'
+    pt: 'Escreva um artigo original e detalhado em português sobre o panorama de blockchain e criptoativos em 2026. Foque especialmente na tokenização de ativos reais (RWA) — como imóveis, títulos de dívida, commodities e fundos estão sendo tokenizados, regulamentação atual no Brasil e internacionalmente, casos de uso institucionais concretos, e o impacto para investidores. Mencione também DeFi institucional e avanços regulatórios relevantes.',
+    en: 'Write an original, detailed article in English about the blockchain and crypto landscape in 2026. Focus especially on Real-World Asset (RWA) tokenization — how real estate, debt instruments, commodities, and funds are being tokenized, current regulations in Brazil and internationally, concrete institutional use cases, and the impact for investors. Also cover institutional DeFi and relevant regulatory advances.'
   }
 };
 
