@@ -74,21 +74,26 @@ export default async function handler(req, res) {
 
     const responseText = message.content[0].text;
 
-    // Parse JSON from Claude's response
+    // Parse JSON from Claude's response (handles markdown code blocks)
     let articleTitle, articleContent;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      // Strip markdown code fences if present
+      let cleanText = responseText;
+      const codeBlockMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleanText = codeBlockMatch[1].trim();
+      }
+      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         articleTitle = parsed.title;
         articleContent = parsed.content;
       } else {
-        const lines = responseText.split('\n');
-        articleTitle = lines[0].replace(/^#\s*/, '').trim();
-        articleContent = lines.slice(1).join('\n').trim();
+        throw new Error('No JSON found');
       }
     } catch {
-      const lines = responseText.split('\n');
+      // Fallback: treat as plain text
+      const lines = responseText.replace(/```json\n?|```\n?/g, '').split('\n');
       articleTitle = lines[0].replace(/^#\s*/, '').trim();
       articleContent = lines.slice(1).join('\n').trim();
     }

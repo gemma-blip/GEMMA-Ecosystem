@@ -1,4 +1,4 @@
-import { put, del, list, get } from '@vercel/blob';
+import { put, del, list } from '@vercel/blob';
 
 async function verifyAdmin(req) {
   const jwtModule = await import('jsonwebtoken');
@@ -43,8 +43,10 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Article not found in pending' });
     }
 
-    const blobData = await get(blobs[0].url, { token: process.env.BLOB_READ_WRITE_TOKEN });
-    const article = JSON.parse(await blobData.text());
+    const response = await fetch(blobs[0].downloadUrl || blobs[0].url, {
+      headers: { 'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
+    });
+    const article = await response.json();
 
     article.status = 'approved';
     article.approvedAt = new Date().toISOString();

@@ -1,4 +1,4 @@
-import { list, get } from '@vercel/blob';
+import { list } from '@vercel/blob';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -32,8 +32,11 @@ export default async function handler(req, res) {
         .filter(blob => blob.pathname.endsWith('.json'))
         .map(async (blob) => {
           try {
-            const blobData = await get(blob.url, { token: process.env.BLOB_READ_WRITE_TOKEN });
-            return JSON.parse(await blobData.text());
+            const response = await fetch(blob.downloadUrl || blob.url, {
+              headers: { 'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
+            });
+            if (!response.ok) return null;
+            return await response.json();
           } catch {
             return null;
           }
