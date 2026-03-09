@@ -1,8 +1,3 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -17,6 +12,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    const bcryptModule = await import('bcryptjs');
+    const bcrypt = bcryptModule.default || bcryptModule;
+    const jwtModule = await import('jsonwebtoken');
+    const jwt = jwtModule.default || jwtModule;
+
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (e) { body = {}; }
@@ -32,7 +32,6 @@ export default async function handler(req, res) {
     const secret = process.env.ADMIN_JWT_SECRET;
 
     if (!hash || !secret) {
-      console.error('Missing ADMIN_PASSWORD_HASH or ADMIN_JWT_SECRET env vars');
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
@@ -51,14 +50,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ token, expiresIn: '24h' });
   } catch (err) {
     console.error('Auth error:', err);
-    return res.status(500).json({
-      error: 'Authentication failed',
-      details: err.message,
-      stack: err.stack?.split('\n').slice(0, 3),
-      bodyType: typeof req.body,
-      hasHash: !!process.env.ADMIN_PASSWORD_HASH,
-      hasSecret: !!process.env.ADMIN_JWT_SECRET,
-      bcryptType: typeof bcrypt.compare,
-    });
+    return res.status(500).json({ error: 'Authentication failed', details: String(err) });
   }
 }
