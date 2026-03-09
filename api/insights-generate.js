@@ -13,20 +13,27 @@ You write professional, well-researched articles about international tax plannin
 Your articles should be authoritative, citing real frameworks and jurisdictions when relevant.
 Always write in a professional tone suitable for institutional investors and legal professionals.
 Structure articles with a clear title, introduction, 3-4 main sections, and conclusion.
-Format the output as JSON with "title" and "content" fields. The content should use markdown formatting.`;
+
+IMPORTANT: Format your response EXACTLY like this:
+<article_title>Your Article Title Here</article_title>
+<article_content>
+Your full article content here in markdown format...
+</article_content>
+
+Do NOT wrap the output in JSON or code blocks. Use the XML tags above.`;
 
 const TOPIC_PROMPTS = {
   'flag-theory': {
-    pt: 'Escreva um artigo original e detalhado em português sobre a Teoria das Bandeiras (Flag Theory) aplicada a investidores de criptoativos. Aborde estratégias de diversificação jurisdicional, residência fiscal, e como estruturar patrimônio digital internacionalmente. Retorne JSON com campos "title" (string) e "content" (string markdown).',
-    en: 'Write an original, detailed article in English about Flag Theory applied to crypto investors. Cover jurisdictional diversification strategies, tax residency, and how to structure digital assets internationally. Return JSON with "title" (string) and "content" (markdown string) fields.'
+    pt: 'Escreva um artigo original e detalhado em português sobre a Teoria das Bandeiras (Flag Theory) aplicada a investidores de criptoativos. Aborde estratégias de diversificação jurisdicional, residência fiscal, e como estruturar patrimônio digital internacionalmente.',
+    en: 'Write an original, detailed article in English about Flag Theory applied to crypto investors. Cover jurisdictional diversification strategies, tax residency, and how to structure digital assets internationally.'
   },
   'tax-planning': {
-    pt: 'Escreva um artigo original e detalhado em português sobre planejamento tributário internacional para detentores de criptoativos. Aborde estruturas offshore/onshore, tratados de dupla tributação, e conformidade regulatória no Brasil e Europa. Retorne JSON com campos "title" (string) e "content" (string markdown).',
-    en: 'Write an original, detailed article in English about international tax planning for crypto asset holders. Cover offshore/onshore structures, double taxation treaties, and regulatory compliance in Brazil and Europe. Return JSON with "title" (string) and "content" (markdown string) fields.'
+    pt: 'Escreva um artigo original e detalhado em português sobre planejamento tributário internacional para detentores de criptoativos. Aborde estruturas offshore/onshore, tratados de dupla tributação, e conformidade regulatória no Brasil e Europa.',
+    en: 'Write an original, detailed article in English about international tax planning for crypto asset holders. Cover offshore/onshore structures, double taxation treaties, and regulatory compliance in Brazil and Europe.'
   },
   'blockchain-innovation': {
-    pt: 'Escreva um artigo original e detalhado em português sobre as inovações mais recentes em tecnologia blockchain. Aborde DeFi institucional, tokenização de ativos reais (RWA), e avanços em escalabilidade e interoperabilidade. Retorne JSON com campos "title" (string) e "content" (string markdown).',
-    en: 'Write an original, detailed article in English about the latest blockchain technology innovations. Cover institutional DeFi, real-world asset tokenization (RWA), and advances in scalability and interoperability. Return JSON with "title" (string) and "content" (markdown string) fields.'
+    pt: 'Escreva um artigo original e detalhado em português sobre as inovações mais recentes em tecnologia blockchain. Aborde DeFi institucional, tokenização de ativos reais (RWA), e avanços em escalabilidade e interoperabilidade.',
+    en: 'Write an original, detailed article in English about the latest blockchain technology innovations. Cover institutional DeFi, real-world asset tokenization (RWA), and advances in scalability and interoperability.'
   }
 };
 
@@ -74,28 +81,26 @@ export default async function handler(req, res) {
 
     const responseText = message.content[0].text;
 
-    // Parse JSON from Claude's response (handles markdown code blocks)
+    // Parse XML-style tags from Claude's response
     let articleTitle, articleContent;
-    try {
-      // Strip markdown code fences if present
-      let cleanText = responseText;
-      const codeBlockMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlockMatch) {
-        cleanText = codeBlockMatch[1].trim();
-      }
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        articleTitle = parsed.title;
-        articleContent = parsed.content;
+
+    const titleMatch = responseText.match(/<article_title>([\s\S]*?)<\/article_title>/);
+    const contentMatch = responseText.match(/<article_content>([\s\S]*?)<\/article_content>/);
+
+    if (titleMatch && contentMatch) {
+      articleTitle = titleMatch[1].trim();
+      articleContent = contentMatch[1].trim();
+    } else {
+      // Fallback: try to extract title from first heading and rest as content
+      const lines = responseText.replace(/```[\s\S]*?```/g, '').split('\n').filter(l => l.trim());
+      const headingLine = lines.find(l => l.startsWith('#'));
+      if (headingLine) {
+        articleTitle = headingLine.replace(/^#+\s*/, '').trim();
+        articleContent = responseText.replace(headingLine, '').trim();
       } else {
-        throw new Error('No JSON found');
+        articleTitle = lines[0]?.trim() || 'Untitled Article';
+        articleContent = lines.slice(1).join('\n').trim();
       }
-    } catch {
-      // Fallback: treat as plain text
-      const lines = responseText.replace(/```json\n?|```\n?/g, '').split('\n');
-      articleTitle = lines[0].replace(/^#\s*/, '').trim();
-      articleContent = lines.slice(1).join('\n').trim();
     }
 
     // Create article object
