@@ -5,7 +5,6 @@ const require = createRequire(import.meta.url);
 const jwt = require('jsonwebtoken');
 
 function verifyPassword(password, storedHash) {
-  // storedHash format: "salt:hash" (both hex)
   const [salt, hash] = storedHash.split(':');
   if (!salt || !hash) return false;
 
@@ -29,6 +28,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const envHash = process.env.ADMIN_PASSWORD_HASH;
+  const secret = process.env.ADMIN_JWT_SECRET;
+
   try {
     let body = req.body;
     if (typeof body === 'string') {
@@ -41,14 +43,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Password is required' });
     }
 
-    const hash = process.env.ADMIN_PASSWORD_HASH;
-    const secret = process.env.ADMIN_JWT_SECRET;
-
-    if (!hash || !secret) {
+    if (!envHash || !secret) {
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    const valid = verifyPassword(password, hash);
+    const valid = verifyPassword(password, envHash);
 
     if (!valid) {
       return res.status(401).json({ error: 'Invalid password' });
@@ -63,6 +62,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ token, expiresIn: '24h' });
   } catch (err) {
     console.error('Auth error:', err);
-    return res.status(500).json({ error: 'Authentication failed', msg: String(err), hashLen: hash?.length, hashHasColon: hash?.includes(':') });
+    return res.status(500).json({
+      error: 'Authentication failed',
+      msg: String(err),
+      hashLen: envHash?.length,
+      hasColon: envHash?.includes(':')
+    });
   }
 }
