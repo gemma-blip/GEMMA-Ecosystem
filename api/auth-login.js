@@ -15,10 +15,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { password } = req.body;
+  // Parse body if needed (Vercel should auto-parse, but handle edge cases)
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+
+  const password = body?.password;
 
   if (!password) {
-    return res.status(400).json({ error: 'Password is required' });
+    return res.status(400).json({ error: 'Password is required', receivedBody: typeof req.body });
   }
 
   const hash = process.env.ADMIN_PASSWORD_HASH;
