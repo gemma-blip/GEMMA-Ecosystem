@@ -1,5 +1,7 @@
 import { del, list } from '@vercel/blob';
-import jwt from 'jsonwebtoken';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const jwt = require('jsonwebtoken');
 
 function verifyAdmin(req) {
   const token = req.headers.authorization?.split(' ')[1];

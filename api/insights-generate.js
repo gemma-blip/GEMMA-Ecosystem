@@ -1,6 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { put } from '@vercel/blob';
-import jwt from 'jsonwebtoken';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const Anthropic = require('@anthropic-ai/sdk');
+const jwt = require('jsonwebtoken');
 
 function verifyAdmin(req) {
   const token = req.headers.authorization?.split(' ')[1];

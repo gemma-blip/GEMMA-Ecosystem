@@ -1,5 +1,7 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
