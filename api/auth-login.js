@@ -51,6 +51,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ token, expiresIn: '24h' });
   } catch (err) {
     console.error('Auth error:', err);
-    return res.status(500).json({ error: 'Authentication failed', details: err.message });
+    return res.status(500).json({
+      error: 'Authentication failed',
+      details: err.message,
+      stack: err.stack?.split('\n').slice(0, 3),
+      bodyType: typeof req.body,
+      hasHash: !!process.env.ADMIN_PASSWORD_HASH,
+      hasSecret: !!process.env.ADMIN_JWT_SECRET,
+      bcryptType: typeof bcrypt.compare,
+    });
   }
 }
