@@ -1,4 +1,5 @@
 import { del, list } from '@vercel/blob';
+import { removeFromPublishedIndex } from './_lib-index.js';
 
 async function verifyAdmin(req) {
   const jwtModule = await import('jsonwebtoken');
@@ -51,6 +52,15 @@ export default async function handler(req, res) {
     await del(blobs[0].url, {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
+
+    // If we deleted a published article, remove it from the public index too
+    if (folder === 'published') {
+      try {
+        await removeFromPublishedIndex(articleId);
+      } catch (indexErr) {
+        console.error('Index update failed (non-fatal):', indexErr);
+      }
+    }
 
     return res.status(200).json({ deleted: true, articleId });
   } catch (err) {

@@ -1,4 +1,5 @@
 import { list } from '@vercel/blob';
+import { readPublishedIndex } from './_lib-index.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,6 +15,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid status. Use: pending, approved, published' });
   }
 
+  // Fast path for published: read single index file (1 "simple" op, aggressive cache)
+  if (status === 'published') {
+    try {
+      const articles = await readPublishedIndex();
+      res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      return res.status(200).json(articles);
+    } catch (err) {
+      console.error('Published list error:', err);
+      return res.status(200).json([]);
+    }
+  }
+
+  // Admin path (pending / approved): still uses list() but called rarely
   try {
     const { blobs } = await list({
       prefix: `articles/${status}/`,
@@ -21,9 +35,6 @@ export default async function handler(req, res) {
     });
 
     if (!blobs || blobs.length === 0) {
-      if (status === 'published') {
-        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
-      }
       return res.status(200).json([]);
     }
 
@@ -46,10 +57,6 @@ export default async function handler(req, res) {
     const validArticles = articles
       .filter(Boolean)
       .sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
-
-    if (status === 'published') {
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
-    }
 
     return res.status(200).json(validArticles);
   } catch (err) {

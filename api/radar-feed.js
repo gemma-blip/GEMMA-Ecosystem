@@ -12,7 +12,9 @@ export default async function handler(req, res) {
     return res.status(200).json(feed);
   } catch (err) {
     console.error('Radar feed error:', err);
-    return res.status(500).json({ error: 'Feed unavailable', details: err.message });
+    // Return empty feed instead of 500 so the UI keeps rendering gracefully
+    res.setHeader('Cache-Control', 'public, s-maxage=60');
+    return res.status(200).json([]);
   }
 }
 
@@ -50,52 +52,56 @@ ${titles.map((t, i) => `${i + 1}. ${t}`).join('\n')}`;
 }
 
 async function fetchCuratedNews() {
-  // Fetch a large pool to curate from
-  const response = await fetch(
-    'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=popular&limit=100',
-    {
-      method: 'GET',
-      headers: { 'Accept': 'application/json', 'User-Agent': 'GEMMA-Ecosystem/1.0' },
-    }
-  );
+  const apiKey = process.env.CRYPTOPANIC_API_KEY;
+  if (!apiKey) throw new Error('CRYPTOPANIC_API_KEY missing');
 
-  if (!response.ok) throw new Error(`CryptoCompare API returned ${response.status}`);
+  // CryptoPanic v1 API — fetch a pool of recent posts to curate from
+  const url = `https://cryptopanic.com/api/v1/posts/?auth_token=${apiKey}&public=true&kind=news&regions=en&filter=hot`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json', 'User-Agent': 'GEMMA-Ecosystem/1.0' },
+  });
+
+  if (!response.ok) throw new Error(`CryptoPanic API returned ${response.status}`);
   const data = await response.json();
-  if (!data.Data || !Array.isArray(data.Data)) throw new Error('Invalid response');
+  if (!data.results || !Array.isArray(data.results)) throw new Error('Invalid response');
+
+  // Normalize to common shape
+  const pool = data.results.map(item => ({
+    id: item.id,
+    title: item.title || '',
+    body: item.description || '',
+    source: item.source?.title || item.source?.domain || 'Unknown',
+    sourceDomain: (item.source?.domain || '').toLowerCase(),
+    url: item.url || item.original_url || '#',
+    published_on: Math.floor(new Date(item.published_at || item.created_at || Date.now()).getTime() / 1000),
+  }));
 
   // Priority keywords for scoring
   const highPriority = ['brazil', 'brasil', 'latin america', 'south america', 'regulation', 'institutional', 'compliance', 'tax', 'cbdc'];
   const medPriority = ['blockchain', 'defi', 'tokenization', 'rwa', 'stablecoin', 'adoption', 'innovation', 'bitcoin', 'ethereum'];
 
   // Preferred quality sources (diverse and credible)
-  const preferredSources = ['cointelegraph', 'coindesk', 'decrypt', 'bloomberg', 'bitcoin.com', 'bitcoinist', 'theblock', 'amb crypto', 'newsBTC', 'cryptopolitan'];
+  const preferredSources = ['cointelegraph', 'coindesk', 'decrypt', 'bloomberg', 'bitcoin.com', 'bitcoinist', 'theblock', 'ambcrypto', 'newsbtc', 'cryptopolitan', 'reuters', 'ft.com', 'wsj'];
 
-  const scored = data.Data.map((item) => {
-    const text = `${item.title} ${item.body || ''}`.toLowerCase();
-    const sourceName = (item.source_info?.name || item.source || '').toLowerCase();
+  const scored = pool.map((item) => {
+    const text = `${item.title} ${item.body}`.toLowerCase();
+    const sourceName = `${item.source} ${item.sourceDomain}`.toLowerCase();
     let score = 0;
 
-    // High priority keywords (Brazil, regulation, institutional)
     for (const kw of highPriority) {
       if (text.includes(kw)) score += 5;
     }
-
-    // Medium priority keywords
     for (const kw of medPriority) {
       if (text.includes(kw)) score += 1;
     }
-
-    // Boost preferred credible sources
     if (preferredSources.some(s => sourceName.includes(s))) {
       score += 8;
     }
-
-    // Penalize "Bitcoin World" to ensure diversity (they flood the feed)
     if (sourceName.includes('bitcoin world')) {
       score -= 10;
     }
 
-    // Slight recency boost (within 7 days)
     const ageHours = (Date.now() - item.published_on * 1000) / (1000 * 60 * 60);
     if (ageHours < 48) score += 2;
     else if (ageHours < 168) score += 1;
@@ -103,7 +109,6 @@ async function fetchCuratedNews() {
     return { item, score, source: sourceName };
   });
 
-  // Sort by score
   scored.sort((a, b) => b.score - a.score);
 
   // Select top 5 with max 1 article per source for diversity
@@ -120,7 +125,6 @@ async function fetchCuratedNews() {
     }
   }
 
-  // If we don't have enough (due to source limit), fill from remaining
   if (selected.length < 5) {
     for (const entry of scored) {
       if (selected.length >= 5) break;
@@ -142,8 +146,8 @@ async function fetchCuratedNews() {
         en: item.title,
         pt: ptTitles?.[index] || item.title,
       },
-      source: item.source_info?.name || item.source || 'Unknown',
-      newsUrl: item.guid || item.url || '#',
+      source: item.source || 'Unknown',
+      newsUrl: item.url,
       timestamp: publishedDate.toISOString(),
       date: {
         pt: publishedDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }),

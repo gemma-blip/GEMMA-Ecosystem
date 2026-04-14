@@ -1,4 +1,5 @@
 import { put, del, list } from '@vercel/blob';
+import { addToPublishedIndex } from './_lib-index.js';
 
 async function verifyAdmin(req) {
   const jwtModule = await import('jsonwebtoken');
@@ -60,6 +61,13 @@ export default async function handler(req, res) {
     await del(blobs[0].url, {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
+
+    // Update the published index so the public list endpoint doesn't need to list() blobs
+    try {
+      await addToPublishedIndex(article);
+    } catch (indexErr) {
+      console.error('Index update failed (non-fatal):', indexErr);
+    }
 
     return res.status(200).json({ status: 'published', articleId });
   } catch (err) {
