@@ -1,3 +1,14 @@
+// Global Crypto Radar — aggregates multiple trusted RSS feeds, scores for
+// relevance (Brazil / regulation / institutional bias), and returns the top 5
+// with Portuguese translations of the headlines.
+
+const FEEDS = [
+  { source: 'Cointelegraph', url: 'https://cointelegraph.com/rss' },
+  { source: 'Decrypt', url: 'https://decrypt.co/feed' },
+  { source: 'CryptoSlate', url: 'https://cryptoslate.com/feed/' },
+  { source: 'Bitcoin.com News', url: 'https://news.bitcoin.com/feed/' },
+];
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -12,11 +23,74 @@ export default async function handler(req, res) {
     return res.status(200).json(feed);
   } catch (err) {
     console.error('Radar feed error:', err);
-    // Return empty feed instead of 500 so the UI keeps rendering gracefully
     res.setHeader('Cache-Control', 'public, s-maxage=60');
     return res.status(200).json([]);
   }
 }
+
+// --- RSS parsing helpers ------------------------------------------------
+
+function stripCdata(s) {
+  if (!s) return '';
+  return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+}
+
+function stripHtml(s) {
+  return stripCdata(s).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+}
+
+function extractTag(block, tag) {
+  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const m = block.match(re);
+  return m ? m[1] : '';
+}
+
+function parseRss(xml, source) {
+  const items = [];
+  const itemRegex = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  let match;
+  while ((match = itemRegex.exec(xml)) !== null && items.length < 25) {
+    const block = match[1];
+    const title = stripHtml(extractTag(block, 'title'));
+    const link = stripHtml(extractTag(block, 'link'));
+    const pubDate = stripHtml(extractTag(block, 'pubDate'));
+    const description = stripHtml(extractTag(block, 'description'));
+    if (!title || !link) continue;
+    const ts = pubDate ? new Date(pubDate).getTime() : Date.now();
+    items.push({
+      id: `${source}-${link}`,
+      title,
+      body: description,
+      source,
+      url: link,
+      published_on: Math.floor((isNaN(ts) ? Date.now() : ts) / 1000),
+    });
+  }
+  return items;
+}
+
+async function fetchFeed(feed) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(feed.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (GEMMA-Ecosystem/1.0; +https://gemma.com.br)',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return [];
+    const xml = await res.text();
+    return parseRss(xml, feed.source);
+  } catch (err) {
+    console.error(`Feed ${feed.source} failed:`, err.message);
+    return [];
+  }
+}
+
+// --- Translation ---------------------------------------------------------
 
 async function translateTitles(titles) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -51,107 +125,60 @@ ${titles.map((t, i) => `${i + 1}. ${t}`).join('\n')}`;
   }
 }
 
+// --- Curation ------------------------------------------------------------
+
 async function fetchCuratedNews() {
-  const apiKey = process.env.CRYPTOPANIC_API_KEY;
-  if (!apiKey) throw new Error('CRYPTOPANIC_API_KEY missing');
+  const results = await Promise.all(FEEDS.map(fetchFeed));
+  const pool = results.flat();
+  if (pool.length === 0) throw new Error('All feeds empty');
 
-  // CryptoPanic v1 API — fetch a pool of recent posts to curate from
-  const url = `https://cryptopanic.com/api/v1/posts/?auth_token=${apiKey}&public=true&kind=news&regions=en&filter=hot`;
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'Accept': 'application/json', 'User-Agent': 'GEMMA-Ecosystem/1.0' },
-  });
-
-  if (!response.ok) throw new Error(`CryptoPanic API returned ${response.status}`);
-  const data = await response.json();
-  if (!data.results || !Array.isArray(data.results)) throw new Error('Invalid response');
-
-  // Normalize to common shape
-  const pool = data.results.map(item => ({
-    id: item.id,
-    title: item.title || '',
-    body: item.description || '',
-    source: item.source?.title || item.source?.domain || 'Unknown',
-    sourceDomain: (item.source?.domain || '').toLowerCase(),
-    url: item.url || item.original_url || '#',
-    published_on: Math.floor(new Date(item.published_at || item.created_at || Date.now()).getTime() / 1000),
-  }));
-
-  // Priority keywords for scoring
-  const highPriority = ['brazil', 'brasil', 'latin america', 'south america', 'regulation', 'institutional', 'compliance', 'tax', 'cbdc'];
+  const highPriority = ['brazil', 'brasil', 'latin america', 'south america', 'regulation', 'institutional', 'compliance', 'tax', 'cbdc', 'sec', 'etf'];
   const medPriority = ['blockchain', 'defi', 'tokenization', 'rwa', 'stablecoin', 'adoption', 'innovation', 'bitcoin', 'ethereum'];
 
-  // Preferred quality sources (diverse and credible)
-  const preferredSources = ['cointelegraph', 'coindesk', 'decrypt', 'bloomberg', 'bitcoin.com', 'bitcoinist', 'theblock', 'ambcrypto', 'newsbtc', 'cryptopolitan', 'reuters', 'ft.com', 'wsj'];
-
-  const scored = pool.map((item) => {
+  const scored = pool.map(item => {
     const text = `${item.title} ${item.body}`.toLowerCase();
-    const sourceName = `${item.source} ${item.sourceDomain}`.toLowerCase();
     let score = 0;
-
-    for (const kw of highPriority) {
-      if (text.includes(kw)) score += 5;
-    }
-    for (const kw of medPriority) {
-      if (text.includes(kw)) score += 1;
-    }
-    if (preferredSources.some(s => sourceName.includes(s))) {
-      score += 8;
-    }
-    if (sourceName.includes('bitcoin world')) {
-      score -= 10;
-    }
-
+    for (const kw of highPriority) if (text.includes(kw)) score += 5;
+    for (const kw of medPriority) if (text.includes(kw)) score += 1;
     const ageHours = (Date.now() - item.published_on * 1000) / (1000 * 60 * 60);
-    if (ageHours < 48) score += 2;
+    if (ageHours < 24) score += 3;
+    else if (ageHours < 72) score += 2;
     else if (ageHours < 168) score += 1;
-
-    return { item, score, source: sourceName };
+    return { item, score };
   });
 
   scored.sort((a, b) => b.score - a.score);
 
-  // Select top 5 with max 1 article per source for diversity
+  // Top 5, max 1 per source
   const selected = [];
   const sourceCounts = {};
-  const MAX_PER_SOURCE = 1;
-
   for (const entry of scored) {
     if (selected.length >= 5) break;
-    const src = entry.source;
+    const src = entry.item.source;
     sourceCounts[src] = (sourceCounts[src] || 0) + 1;
-    if (sourceCounts[src] <= MAX_PER_SOURCE) {
-      selected.push(entry.item);
-    }
+    if (sourceCounts[src] <= 1) selected.push(entry.item);
   }
-
   if (selected.length < 5) {
     for (const entry of scored) {
       if (selected.length >= 5) break;
-      if (!selected.includes(entry.item)) {
-        selected.push(entry.item);
-      }
+      if (!selected.includes(entry.item)) selected.push(entry.item);
     }
   }
 
-  // Translate titles to Portuguese
-  const englishTitles = selected.map(item => item.title);
+  const englishTitles = selected.map(i => i.title);
   const ptTitles = await translateTitles(englishTitles);
 
   return selected.map((item, index) => {
-    const publishedDate = new Date(item.published_on * 1000);
+    const d = new Date(item.published_on * 1000);
     return {
       id: String(item.id),
-      title: {
-        en: item.title,
-        pt: ptTitles?.[index] || item.title,
-      },
-      source: item.source || 'Unknown',
+      title: { en: item.title, pt: ptTitles?.[index] || item.title },
+      source: item.source,
       newsUrl: item.url,
-      timestamp: publishedDate.toISOString(),
+      timestamp: d.toISOString(),
       date: {
-        pt: publishedDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }),
-        en: publishedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        pt: d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }),
+        en: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       },
     };
   });
